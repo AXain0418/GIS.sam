@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖資展示系統 (支援 Shapefile)</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { height: 100vh; width: 100%; z-index: 1; }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        
+        .popup-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px;}
+        .popup-table th, .popup-table td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }
+        .popup-table th { background-color: #f3f4f6; width: 40%; color: #374151;}
+        .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .leaflet-popup-content { margin: 16px; width: 280px !important; max-height: 300px; overflow-y: auto;}
+    </style>
+</head>
+<body class="flex flex-col md:flex-row relative bg-gray-100">
+
+    <!-- 側邊欄 Sidebar -->
+    <div id="sidebar" class="w-full md:w-80 bg-white h-screen shadow-2xl flex flex-col absolute md:relative z-[1000] transition-transform duration-300 transform -translate-x-full md:translate-x-0">
+        
+        <div class="bg-[#1f2937] text-white p-4 flex justify-between items-center shadow-md">
+            <h1 class="text-lg font-bold tracking-wider"><i class="fa-solid fa-map-location-dot mr-2 text-[#60a5fa]"></i> 圖資展示系統</h1>
+            <button id="closeSidebar" class="md:hidden text-gray-300 hover:text-white transition">
+                <i class="fa-solid fa-times text-xl"></i>
+            </button>
+        </div>
+
+        <!-- 頁籤 (Tabs) -->
+        <div class="flex border-b text-sm font-medium shadow-sm z-10">
+            <button class="flex-1 py-3 text-center border-b-2 border-blue-600 text-blue-600 bg-blue-50 focus:outline-none transition" id="tab-layers" onclick="switchTab('layers')">
+                <i class="fa-solid fa-layer-group mb-1 block text-lg"></i> 圖層控制
+            </button>
+            <button class="flex-1 py-3 text-center border-b-2 border-transparent text-gray-500 hover:text-blue-600 hover:bg-gray-50 focus:outline-none transition" id="tab-upload" onclick="switchTab('upload')">
+                <i class="fa-solid fa-file-arrow-up mb-1 block text-lg"></i> 載入圖資
+            </button>
+        </div>
+
+        <!-- 頁籤內容區域 -->
+        <div class="flex-1 overflow-y-auto p-5 bg-white">
+            
+            <!-- 圖層控制頁籤 -->
+            <div id="content-layers" class="space-y-6 block">
+                <div>
+                    <h3 class="font-bold text-gray-800 border-l-4 border-blue-500 pl-2 mb-3 text-sm flex items-center">
+                        <i class="fa-solid fa-map mr-2 text-gray-500"></i> 底圖切換
+                    </h3>
+                    <div class="space-y-3 pl-2" id="basemap-controls"></div>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <div>
+                    <h3 class="font-bold text-gray-800 border-l-4 border-green-500 pl-2 mb-3 text-sm flex items-center justify-between">
+                        <span><i class="fa-solid fa-draw-polygon mr-2 text-gray-500"></i> 自訂圖層</span>
+                        <span class="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full" id="layer-count">0</span>
+                    </h3>
+                    <div id="user-layers-list" class="space-y-2 pl-2">
+                        <p id="empty-layers-msg" class="text-xs text-gray-400 italic text-center py-4 bg-gray-50 rounded border border-dashed border-gray-200">
+                            尚未載入圖層。<br>請切換至「載入圖資」上傳檔案。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 載入圖資頁籤 -->
+            <div id="content-upload" class="hidden space-y-4">
+                
+                <div class="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                    <label for="shp-encoding" class="block text-sm font-bold text-gray-700 mb-2">
+                        <i class="fa-solid fa-language text-blue-500 mr-1"></i> 屬性資料編碼 (解決中文亂碼)
+                    </label>
+                    <select id="shp-encoding" class="w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2 bg-gray-50 cursor-pointer">
+                        <option value="big5" selected>Big5 (台灣常見圖資，若亂碼請選此)</option>
+                        <option value="utf-8">UTF-8 (國際標準)</option>
+                        <option value="auto">自動偵測 (依賴 .cpg 檔)</option>
+                    </select>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-xs text-blue-800 leading-relaxed shadow-sm">
+                    <i class="fa-solid fa-circle-info mr-1 text-blue-600"></i> 請將您的 Shapefile 檔案壓縮成一個 <b>.zip</b> 檔案後上傳。
+                </div>
+                
+                <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-50 transition duration-200 ease-in-out cursor-pointer relative bg-white">
+                    <input type="file" id="shpInput" accept=".zip" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    <div class="flex flex-col items-center pointer-events-none">
+                        <div class="bg-blue-100 text-blue-500 p-3 rounded-full mb-3">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
+                        </div>
+                        <span class="text-gray-700 font-medium text-sm">點擊選擇檔案</span>
+                        <span class="text-xs text-gray-400 mt-2 font-light">或將 ZIP 檔案拖曳至此處</span>
+                    </div>
+                </div>
+                
+                <div id="uploadStatus" class="hidden text-sm p-3 rounded-lg font-medium text-center shadow-sm"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex-1 relative w-full h-full">
+        <button id="openSidebar" class="absolute top-4 left-4 z-[999] bg-white p-2.5 rounded-lg shadow-lg md:hidden text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition border border-gray-200">
+            <i class="fa-solid fa-bars text-lg"></i>
+        </button>
+        <div id="map"></div>
+    </div>
+
+    <!-- Leaflet JS & MarkerCluster JS & shpjs -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
+
+    <script>
+        /* ==========================================
+         * 0. 修補 TextDecoder 解決 DBF 中文亂碼問題
+         * ========================================== */
+        const OriginalTextDecoder = window.TextDecoder;
+        window.TextDecoder = class extends OriginalTextDecoder {
+            constructor(encoding, options) {
+                const encSelect = document.getElementById('shp-encoding');
+                let targetEncoding = encSelect && encSelect.value !== 'auto' ? encSelect.value : encoding;
+                try { super(targetEncoding, options); } 
+                catch (e) { super(encoding, options); }
+            }
+        };
+
+        /* ==========================================
+         * 1. 介面與側邊欄邏輯
+         * ========================================== */
+        const sidebar = document.getElementById('sidebar');
+        const openBtn = document.getElementById('openSidebar');
+        const closeBtn = document.getElementById('closeSidebar');
+
+        openBtn.addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+        closeBtn.addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+        function switchTab(tab) {
+            const tabs = {
+                'layers': { btn: document.getElementById('tab-layers'), content: document.getElementById('content-layers') },
+                'upload': { btn: document.getElementById('tab-upload'), content: document.getElementById('content-upload') }
+            };
+            for (let key in tabs) {
+                if (key === tab) {
+                    tabs[key].btn.classList.add('text-blue-600', 'border-blue-600', 'bg-blue-50');
+                    tabs[key].btn.classList.remove('text-gray-500', 'border-transparent', 'hover:bg-gray-50');
+                    tabs[key].content.classList.remove('hidden');
+                    tabs[key].content.classList.add('block');
+                } else {
+                    tabs[key].btn.classList.remove('text-blue-600', 'border-blue-600', 'bg-blue-50');
+                    tabs[key].btn.classList.add('text-gray-500', 'border-transparent', 'hover:bg-gray-50');
+                    tabs[key].content.classList.add('hidden');
+                    tabs[key].content.classList.remove('block');
+                }
+            }
+        }
+
+        /* ==========================================
+         * 2. 地圖初始化與底圖設定
+         * ========================================== */
+        const map = L.map('map', {
+            center: [23.6978, 120.9605],
+            zoom: 7,
+            zoomControl: false, 
+            preferCanvas: true  
+        });
+        
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        const basemaps = {
+            "nlsc_emap": {
+                name: "臺灣通用電子地圖",
+                layer: L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 19, attribution: '© 內政部國土測繪中心' })
+            },
+            "taichung_buildings_combo": {
+                name: "電子地圖 + 台中建築圖磚",
+                layer: L.layerGroup([
+                    // 底層：維持內政部電子地圖
+                    L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 19, attribution: '© 內政部國土測繪中心' }),
+                    // 上層：疊加您自製的透明背景建築物圖磚
+                    L.tileLayer('./taichung_buildings_tiles/{z}/{x}/{y}.png', { 
+                        minZoom: 13, 
+                        maxZoom: 17, 
+                        attribution: '© 臺中市建築物' 
+                    })
+                ])
+            },
+            "nlsc_photo": {
+                name: "臺灣通用正射影像",
+                layer: L.tileLayer('https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 19, attribution: '© 內政部國土測繪中心' })
+            },
+            "osm": {
+                name: "OpenStreetMap (開放街圖)",
+                layer: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' })
+            }
+        };
+
+        let currentBasemap = basemaps["nlsc_emap"].layer;
+        currentBasemap.addTo(map);
+
+        const basemapContainer = document.getElementById('basemap-controls');
+        for (let key in basemaps) {
+            const isChecked = key === "nlsc_emap" ? "checked" : "";
+            const html = `
+                <div class="flex items-center group cursor-pointer">
+                    <input type="radio" id="bm-${key}" name="basemap" value="${key}" ${isChecked} 
+                           class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 cursor-pointer">
+                    <label for="bm-${key}" class="ml-2 text-sm font-medium text-gray-700 group-hover:text-blue-600 transition cursor-pointer flex-1">
+                        ${basemaps[key].name}
+                    </label>
+                </div>
+            `;
+            basemapContainer.insertAdjacentHTML('beforeend', html);
+            
+            document.getElementById(`bm-${key}`).addEventListener('change', function(e) {
+                if(e.target.checked) {
+                    map.removeLayer(currentBasemap);
+                    currentBasemap = basemaps[key].layer;
+                    currentBasemap.addTo(map);
+                }
+            });
+        }
+
+        /* ==========================================
+         * 3. Shapefile 檔案上傳與解析邏輯
+         * ========================================== */
+        const fileInput = document.getElementById('shpInput');
+        const dropZone = document.getElementById('drop-zone');
+        const userLayersControl = document.getElementById('user-layers-list');
+        const emptyMsg = document.getElementById('empty-layers-msg');
+        const layerCountEl = document.getElementById('layer-count');
+        const customCanvasRenderer = L.canvas({ padding: 0.5 });
+        
+        let layerIdCounter = 0;
+        const userLayersMap = {};
+
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-blue-50', 'border-blue-400'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('bg-blue-50', 'border-blue-400'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('bg-blue-50', 'border-blue-400');
+            if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]);
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                processFile(e.target.files[0]);
+                e.target.value = ''; 
+            }
+        });
+
+        function processFile(file) {
+            if (!file.name.toLowerCase().endsWith('.zip')) {
+                showUploadStatus('格式錯誤：請上傳 ZIP 格式的壓縮檔。', 'error');
+                return;
+            }
+
+            const fileSizeMB = file.size / (1024 * 1024);
+            if (fileSizeMB > 30) {
+                if (!confirm(`警告：您的檔案大小為 ${fileSizeMB.toFixed(1)} MB。\n瀏覽器直接解析過大的圖資可能會導致崩潰。\n\n確定要繼續嘗試載入嗎？`)) return;
+            }
+
+            showUploadStatus('<i class="fa-solid fa-spinner fa-spin mr-2"></i> 圖資解析中，請稍候...', 'loading');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                shp(e.target.result).then(function(geojson) {
+                    addGeoJsonLayer(file.name, geojson);
+                    showUploadStatus('<i class="fa-solid fa-circle-check mr-2"></i> 圖資載入成功！', 'success');
+                    setTimeout(() => document.getElementById('uploadStatus').classList.add('hidden'), 3000);
+                    switchTab('layers');
+                }).catch(function(err) {
+                    console.error(err);
+                    showUploadStatus('<i class="fa-solid fa-triangle-exclamation mr-2"></i> 解析失敗：請確認壓縮檔內包含正確附屬檔案。', 'error');
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function addGeoJsonLayer(fileName, geojson) {
+            const hue = Math.floor(Math.random() * 360);
+            const color = `hsl(${hue}, 70%, 50%)`;
+            const fillColor = `hsl(${hue}, 70%, 70%)`;
+
+            const clusterGroup = L.markerClusterGroup({
+                chunkedLoading: true, 
+                spiderfyOnMaxZoom: true, 
+                showCoverageOnHover: false, 
+                zoomToBoundsOnClick: true, 
+                maxClusterRadius: 20, 
+                disableClusteringAtZoom: 14 
+            });
+
+            const geoJsonLayer = L.geoJSON(geojson, {
+                renderer: customCanvasRenderer, 
+                style: function(feature) {
+                    return {
+                        color: color,
+                        weight: 2,
+                        fillColor: fillColor,
+                        fillOpacity: 0.4,
+                        smoothFactor: 2.5 
+                    };
+                },
+                pointToLayer: function (feature, latlng) {
+                    return L.circleMarker(latlng, {
+                        renderer: customCanvasRenderer, 
+                        radius: 6,
+                        fillColor: fillColor,
+                        color: color,
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                },
+                onEachFeature: function(feature, layer) {
+                    if (feature.properties) {
+                        let popupContent = `
+                            <div class="font-bold text-[#1f2937] mb-2 border-b pb-2 flex items-center">
+                                <i class="fa-solid fa-table-list text-blue-500 mr-2"></i> 屬性資料
+                            </div>
+                            <table class="popup-table"><tbody>`;
+                        let hasData = false;
+                        for (let key in feature.properties) {
+                            let val = feature.properties[key];
+                            if(val === null || val === undefined) val = "";
+                            popupContent += `<tr><th>${key}</th><td>${val}</td></tr>`;
+                            hasData = true;
+                        }
+                        popupContent += '</tbody></table>';
+                        
+                        if (hasData) {
+                            layer.bindPopup(popupContent, { maxWidth: 350, minWidth: 200 });
+                            layer.bindTooltip("點擊查看屬性", { sticky: true, className: 'text-sm bg-white px-2 py-1 shadow rounded border border-gray-200' });
+                        }
+                    }
+                }
+            });
+
+            clusterGroup.addLayer(geoJsonLayer);
+            map.addLayer(clusterGroup);
+            map.fitBounds(clusterGroup.getBounds());
+            addLayerToSidebar(fileName, clusterGroup);
+        }
+
+        function addLayerToSidebar(name, layer) {
+            const id = 'layer-' + (layerIdCounter++);
+            userLayersMap[id] = layer;
+            
+            if (emptyMsg) emptyMsg.style.display = 'none';
+
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between mb-2 bg-gray-50 border border-gray-100 p-2 rounded hover:shadow-sm transition';
+            div.id = `container-${id}`;
+            div.innerHTML = `
+                <div class="flex items-center overflow-hidden flex-1 mr-2">
+                    <input type="checkbox" id="${id}" checked class="w-4 h-4 text-green-600 bg-white border-gray-300 rounded focus:ring-green-500 cursor-pointer flex-shrink-0">
+                    <label for="${id}" class="ml-2 text-sm font-semibold text-gray-700 truncate cursor-pointer" style="max-width: 140px;" title="${name}">${name}</label>
+                </div>
+                <div class="flex items-center flex-shrink-0 space-x-2">
+                    <button onclick="zoomToLayer('${id}')" class="text-blue-400 hover:text-blue-600 transition" title="縮放至圖層範圍">
+                        <i class="fa-solid fa-magnifying-glass-location"></i>
+                    </button>
+                    <button onclick="removeLayer('${id}')" class="text-red-400 hover:text-red-600 transition" title="移除圖層">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            `;
+            userLayersControl.appendChild(div);
+            layerCountEl.textContent = Object.keys(userLayersMap).length;
+
+            document.getElementById(id).addEventListener('change', function(e) {
+                if (e.target.checked) map.addLayer(userLayersMap[id]);
+                else map.removeLayer(userLayersMap[id]);
+            });
+        }
+
+        window.zoomToLayer = function(id) {
+            if(userLayersMap[id]) {
+                const checkbox = document.getElementById(id);
+                if(!checkbox.checked) {
+                    checkbox.checked = true;
+                    map.addLayer(userLayersMap[id]);
+                }
+                const bounds = userLayersMap[id].getBounds ? userLayersMap[id].getBounds() : userLayersMap[id].getLayers()[0].getBounds();
+                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+                if(window.innerWidth < 768) sidebar.classList.add('-translate-x-full');
+            }
+        }
+
+        window.removeLayer = function(id) {
+            if (userLayersMap[id]) {
+                map.removeLayer(userLayersMap[id]);
+                delete userLayersMap[id];
+            }
+            const container = document.getElementById(`container-${id}`);
+            if (container) container.remove();
+            
+            const count = Object.keys(userLayersMap).length;
+            layerCountEl.textContent = count;
+            if (count === 0 && emptyMsg) emptyMsg.style.display = 'block';
+        }
+
+        function showUploadStatus(html, type) {
+            const el = document.getElementById('uploadStatus');
+            el.innerHTML = html;
+            el.classList.remove('hidden', 'bg-blue-100', 'text-blue-700', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+            
+            if (type === 'loading') el.classList.add('bg-blue-100', 'text-blue-700');
+            else if (type === 'error') el.classList.add('bg-red-100', 'text-red-700');
+            else if (type === 'success') el.classList.add('bg-green-100', 'text-green-700');
+        }
+
+        /* ==========================================
+         * 4. 【新增】從 URL 直接載入伺服器上的 Shapefile 範例
+         * ========================================== */
+        function loadShapefileFromURL(url, fileName) {
+            // 切換到載入圖資頁籤顯示讀取動畫
+            switchTab('upload');
+            showUploadStatus(`<i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在下載並解析內建圖資 (${fileName})...`, 'loading');
+            
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) throw new Error("無法讀取檔案，請確認路徑是否正確");
+                    return response.arrayBuffer(); // 將檔案轉為二進制 Buffer
+                })
+                .then(buffer => {
+                    return shp(buffer); // 交給 shpjs 解析
+                })
+                .then(geojson => {
+                    addGeoJsonLayer(fileName, geojson);
+                    showUploadStatus('<i class="fa-solid fa-circle-check mr-2"></i> 內建圖資載入成功！', 'success');
+                    setTimeout(() => document.getElementById('uploadStatus').classList.add('hidden'), 3000);
+                })
+                .catch(err => {
+                    console.error(err);
+                    showUploadStatus('<i class="fa-solid fa-triangle-exclamation mr-2"></i> 載入失敗：' + err.message, 'error');
+                });
+        }
+
+        // 👉 若要測試直接載入，請將你的 zip 檔放在與 HTML 同一個資料夾，然後取消下方註解：
+        // loadShapefileFromURL('./taichung_buildings.zip', '台中建築物');
+
+    </script>
+</body>
+</html>
