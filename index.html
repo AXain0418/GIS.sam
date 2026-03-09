@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>圖資展示系統 (支援 Shapefile)</title>
+    <title>圖資展示系統 (搜尋工具版本)</title>
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -46,12 +46,15 @@
         </div>
 
         <!-- 頁籤 (Tabs) -->
-        <div class="flex border-b text-sm font-medium shadow-sm z-10">
+        <div class="flex border-b text-sm font-medium shadow-sm z-10 bg-white">
             <button class="flex-1 py-3 text-center border-b-2 border-blue-600 text-blue-600 bg-blue-50 focus:outline-none transition" id="tab-layers" onclick="switchTab('layers')">
-                <i class="fa-solid fa-layer-group mb-1 block text-lg"></i> 圖層控制
+                <i class="fa-solid fa-layer-group mb-1 block text-lg"></i> 圖層
+            </button>
+            <button class="flex-1 py-3 text-center border-b-2 border-transparent text-gray-500 hover:text-blue-600 hover:bg-gray-50 focus:outline-none transition" id="tab-search" onclick="switchTab('search')">
+                <i class="fa-solid fa-magnifying-glass mb-1 block text-lg"></i> 搜尋
             </button>
             <button class="flex-1 py-3 text-center border-b-2 border-transparent text-gray-500 hover:text-blue-600 hover:bg-gray-50 focus:outline-none transition" id="tab-upload" onclick="switchTab('upload')">
-                <i class="fa-solid fa-file-arrow-up mb-1 block text-lg"></i> 載入圖資
+                <i class="fa-solid fa-file-arrow-up mb-1 block text-lg"></i> 載入
             </button>
         </div>
 
@@ -76,8 +79,47 @@
                     </h3>
                     <div id="user-layers-list" class="space-y-2 pl-2">
                         <p id="empty-layers-msg" class="text-xs text-gray-400 italic text-center py-4 bg-gray-50 rounded border border-dashed border-gray-200">
-                            尚未載入圖層。<br>請切換至「載入圖資」上傳檔案。
+                            尚未載入圖層。<br>請切換至「載入」上傳檔案。
                         </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 【新增】資料搜尋頁籤 -->
+            <div id="content-search" class="hidden flex flex-col h-full space-y-4">
+                
+                <div class="bg-indigo-50 border border-indigo-200 p-3 rounded-lg text-xs text-indigo-800 leading-relaxed shadow-sm">
+                    <i class="fa-solid fa-circle-info mr-1 text-indigo-600"></i> 請先上傳圖資，再選擇對應的欄位與關鍵字來定位特定資料。
+                </div>
+
+                <div class="bg-white p-3 rounded-lg border border-gray-200 shadow-sm space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">1. 選擇圖層</label>
+                        <select id="search-layer-select" class="w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2 bg-gray-50 cursor-pointer">
+                            <option value="">(請先載入圖層)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">2. 選擇欄位</label>
+                        <select id="search-field-select" class="w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2 bg-gray-50 cursor-pointer">
+                            <option value="">(請先選擇圖層)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">3. 輸入關鍵字搜尋</label>
+                        <div class="relative">
+                            <input type="text" id="search-input" placeholder="例如：台中火車站..." class="w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2 pl-8">
+                            <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 搜尋結果列表 -->
+                <div class="flex-1 flex flex-col min-h-0">
+                    <h4 class="text-xs font-bold text-gray-500 border-b pb-2 mb-2">搜尋結果 <span id="search-result-count" class="text-blue-500 ml-1">0</span></h4>
+                    <div id="search-results-list" class="flex-1 overflow-y-auto space-y-2 pr-1">
+                        <!-- 結果卡片會動態生成於此 -->
+                        <p class="text-xs text-gray-400 italic text-center py-4">請輸入關鍵字開始搜尋</p>
                     </div>
                 </div>
             </div>
@@ -87,7 +129,7 @@
                 
                 <div class="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
                     <label for="shp-encoding" class="block text-sm font-bold text-gray-700 mb-2">
-                        <i class="fa-solid fa-language text-blue-500 mr-1"></i> 屬性資料編碼 (解決中文亂碼)
+                        <i class="fa-solid fa-language text-blue-500 mr-1"></i> 屬性資料編碼
                     </label>
                     <select id="shp-encoding" class="w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2 bg-gray-50 cursor-pointer">
                         <option value="big5" selected>Big5 (台灣常見圖資，若亂碼請選此)</option>
@@ -97,7 +139,7 @@
                 </div>
 
                 <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-xs text-blue-800 leading-relaxed shadow-sm">
-                    <i class="fa-solid fa-circle-info mr-1 text-blue-600"></i> 請將您的 Shapefile 檔案壓縮成一個 <b>.zip</b> 檔案後上傳。
+                    <i class="fa-solid fa-circle-info mr-1 text-blue-600"></i> 請將您的 shp、shx、dbf、prj 檔案壓縮成一個 <b>.zip</b> 檔案後上傳。
                 </div>
                 
                 <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-50 transition duration-200 ease-in-out cursor-pointer relative bg-white">
@@ -126,12 +168,10 @@
     <!-- Leaflet JS & MarkerCluster JS & shpjs -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
 
     <script>
-        /* ==========================================
-         * 0. 修補 TextDecoder 解決 DBF 中文亂碼問題
-         * ========================================== */
         const OriginalTextDecoder = window.TextDecoder;
         window.TextDecoder = class extends OriginalTextDecoder {
             constructor(encoding, options) {
@@ -142,9 +182,6 @@
             }
         };
 
-        /* ==========================================
-         * 1. 介面與側邊欄邏輯
-         * ========================================== */
         const sidebar = document.getElementById('sidebar');
         const openBtn = document.getElementById('openSidebar');
         const closeBtn = document.getElementById('closeSidebar');
@@ -155,6 +192,7 @@
         function switchTab(tab) {
             const tabs = {
                 'layers': { btn: document.getElementById('tab-layers'), content: document.getElementById('content-layers') },
+                'search': { btn: document.getElementById('tab-search'), content: document.getElementById('content-search') },
                 'upload': { btn: document.getElementById('tab-upload'), content: document.getElementById('content-upload') }
             };
             for (let key in tabs) {
@@ -162,54 +200,30 @@
                     tabs[key].btn.classList.add('text-blue-600', 'border-blue-600', 'bg-blue-50');
                     tabs[key].btn.classList.remove('text-gray-500', 'border-transparent', 'hover:bg-gray-50');
                     tabs[key].content.classList.remove('hidden');
-                    tabs[key].content.classList.add('block');
+                    // 當切換到搜尋頁籤時，確保欄位有更新
+                    if(key === 'search') updateSearchFields();
                 } else {
                     tabs[key].btn.classList.remove('text-blue-600', 'border-blue-600', 'bg-blue-50');
                     tabs[key].btn.classList.add('text-gray-500', 'border-transparent', 'hover:bg-gray-50');
                     tabs[key].content.classList.add('hidden');
-                    tabs[key].content.classList.remove('block');
                 }
             }
         }
 
-        /* ==========================================
-         * 2. 地圖初始化與底圖設定
-         * ========================================== */
-        const map = L.map('map', {
-            center: [23.6978, 120.9605],
-            zoom: 7,
-            zoomControl: false, 
-            preferCanvas: true  
-        });
-        
+        const map = L.map('map', { center: [23.6978, 120.9605], zoom: 7, zoomControl: false, preferCanvas: true });
         L.control.zoom({ position: 'topright' }).addTo(map);
 
         const basemaps = {
-            "nlsc_emap": {
-                name: "臺灣通用電子地圖",
-                layer: L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 19, attribution: '© 內政部國土測繪中心' })
-            },
+            "nlsc_emap": { name: "臺灣通用電子地圖", layer: L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 18, attribution: '© 內政部國土測繪中心' }) },
             "taichung_buildings_combo": {
-                name: "電子地圖 + 台中建築圖磚",
+                name: "電子地圖 + 建築分布圖磚",
                 layer: L.layerGroup([
-                    // 底層：維持內政部電子地圖
-                    L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 19, attribution: '© 內政部國土測繪中心' }),
-                    // 上層：疊加您自製的透明背景建築物圖磚
-                    L.tileLayer('./taichung_buildings_tiles/{z}/{x}/{y}.png', { 
-                        minZoom: 13, 
-                        maxZoom: 17, 
-                        attribution: '© 臺中市建築物' 
-                    })
+                    L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 18, attribution: '© 內政部國土測繪中心' }),
+                    L.tileLayer('./taichung_buildings_tiles/{z}/{x}/{y}.png', { minZoom: 13, maxZoom: 18, attribution: '© 臺中市建築物' })
                 ])
             },
-            "nlsc_photo": {
-                name: "臺灣通用正射影像",
-                layer: L.tileLayer('https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 19, attribution: '© 內政部國土測繪中心' })
-            },
-            "osm": {
-                name: "OpenStreetMap (開放街圖)",
-                layer: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' })
-            }
+            "nlsc_photo": { name: "臺灣通用正射影像", layer: L.tileLayer('https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}', { maxZoom: 18, attribution: '© 內政部國土測繪中心' }) },
+            "osm": { name: "OpenStreetMap (開放街圖)", layer: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }) }
         };
 
         let currentBasemap = basemaps["nlsc_emap"].layer;
@@ -220,15 +234,11 @@
             const isChecked = key === "nlsc_emap" ? "checked" : "";
             const html = `
                 <div class="flex items-center group cursor-pointer">
-                    <input type="radio" id="bm-${key}" name="basemap" value="${key}" ${isChecked} 
-                           class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 cursor-pointer">
-                    <label for="bm-${key}" class="ml-2 text-sm font-medium text-gray-700 group-hover:text-blue-600 transition cursor-pointer flex-1">
-                        ${basemaps[key].name}
-                    </label>
+                    <input type="radio" id="bm-${key}" name="basemap" value="${key}" ${isChecked} class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 cursor-pointer">
+                    <label for="bm-${key}" class="ml-2 text-sm font-medium text-gray-700 group-hover:text-blue-600 transition cursor-pointer flex-1">${basemaps[key].name}</label>
                 </div>
             `;
             basemapContainer.insertAdjacentHTML('beforeend', html);
-            
             document.getElementById(`bm-${key}`).addEventListener('change', function(e) {
                 if(e.target.checked) {
                     map.removeLayer(currentBasemap);
@@ -238,47 +248,34 @@
             });
         }
 
-        /* ==========================================
-         * 3. Shapefile 檔案上傳與解析邏輯
-         * ========================================== */
-        const fileInput = document.getElementById('shpInput');
-        const dropZone = document.getElementById('drop-zone');
-        const userLayersControl = document.getElementById('user-layers-list');
-        const emptyMsg = document.getElementById('empty-layers-msg');
-        const layerCountEl = document.getElementById('layer-count');
         const customCanvasRenderer = L.canvas({ padding: 0.5 });
-        
         let layerIdCounter = 0;
-        const userLayersMap = {};
+        
+        // 核心管理物件：存放所有圖層資料，以利搜尋與切換
+        const userLayersMap = {}; 
+        const searchDataMap = {}; // 專門存放用於搜尋的詳細資訊
 
+        const colorPalette = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e'];
+
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('shpInput');
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-blue-50', 'border-blue-400'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('bg-blue-50', 'border-blue-400'));
         dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('bg-blue-50', 'border-blue-400');
+            e.preventDefault(); dropZone.classList.remove('bg-blue-50', 'border-blue-400');
             if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]);
         });
-        
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length) {
-                processFile(e.target.files[0]);
-                e.target.value = ''; 
-            }
+            if (e.target.files.length) { processFile(e.target.files[0]); e.target.value = ''; }
         });
 
         function processFile(file) {
             if (!file.name.toLowerCase().endsWith('.zip')) {
-                showUploadStatus('格式錯誤：請上傳 ZIP 格式的壓縮檔。', 'error');
-                return;
+                showUploadStatus('格式錯誤：請上傳 ZIP 格式的壓縮檔。', 'error'); return;
             }
+            if ((file.size / (1024 * 1024)) > 30 && !confirm(`警告：檔案大於 30 MB，可能會導致崩潰。\n確定繼續嗎？`)) return;
 
-            const fileSizeMB = file.size / (1024 * 1024);
-            if (fileSizeMB > 30) {
-                if (!confirm(`警告：您的檔案大小為 ${fileSizeMB.toFixed(1)} MB。\n瀏覽器直接解析過大的圖資可能會導致崩潰。\n\n確定要繼續嘗試載入嗎？`)) return;
-            }
-
-            showUploadStatus('<i class="fa-solid fa-spinner fa-spin mr-2"></i> 圖資解析中，請稍候...', 'loading');
-
+            showUploadStatus('<i class="fa-solid fa-spinner fa-spin mr-2"></i> 圖資解析中...', 'loading');
             const reader = new FileReader();
             reader.onload = function(e) {
                 shp(e.target.result).then(function(geojson) {
@@ -288,64 +285,45 @@
                     switchTab('layers');
                 }).catch(function(err) {
                     console.error(err);
-                    showUploadStatus('<i class="fa-solid fa-triangle-exclamation mr-2"></i> 解析失敗：請確認壓縮檔內包含正確附屬檔案。', 'error');
+                    showUploadStatus('<i class="fa-solid fa-triangle-exclamation mr-2"></i> 解析失敗。', 'error');
                 });
             };
             reader.readAsArrayBuffer(file);
         }
 
         function addGeoJsonLayer(fileName, geojson) {
-            const hue = Math.floor(Math.random() * 360);
-            const color = `hsl(${hue}, 70%, 50%)`;
-            const fillColor = `hsl(${hue}, 70%, 70%)`;
+            const hexColor = colorPalette[layerIdCounter % colorPalette.length];
+            const initialOpacity = 0.6;
+            let heatData = [];
+            let isPointData = false;
+            let fieldsSet = new Set(); // 收集所有屬性欄位名稱供搜尋使用
 
             const clusterGroup = L.markerClusterGroup({
-                chunkedLoading: true, 
-                spiderfyOnMaxZoom: true, 
-                showCoverageOnHover: false, 
-                zoomToBoundsOnClick: true, 
-                maxClusterRadius: 20, 
-                disableClusteringAtZoom: 14 
+                chunkedLoading: true, spiderfyOnMaxZoom: true, showCoverageOnHover: false, zoomToBoundsOnClick: true, maxClusterRadius: 20, disableClusteringAtZoom: 14 
             });
 
             const geoJsonLayer = L.geoJSON(geojson, {
                 renderer: customCanvasRenderer, 
-                style: function(feature) {
-                    return {
-                        color: color,
-                        weight: 2,
-                        fillColor: fillColor,
-                        fillOpacity: 0.4,
-                        smoothFactor: 2.5 
-                    };
+                style: function() {
+                    return { color: hexColor, weight: 2, fillColor: hexColor, fillOpacity: initialOpacity, opacity: initialOpacity, smoothFactor: 2.5 };
                 },
                 pointToLayer: function (feature, latlng) {
-                    return L.circleMarker(latlng, {
-                        renderer: customCanvasRenderer, 
-                        radius: 6,
-                        fillColor: fillColor,
-                        color: color,
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    });
+                    isPointData = true;
+                    heatData.push([latlng.lat, latlng.lng]);
+                    return L.circleMarker(latlng, { renderer: customCanvasRenderer, radius: 6, fillColor: hexColor, color: hexColor, weight: 2, opacity: initialOpacity, fillOpacity: initialOpacity });
                 },
                 onEachFeature: function(feature, layer) {
                     if (feature.properties) {
-                        let popupContent = `
-                            <div class="font-bold text-[#1f2937] mb-2 border-b pb-2 flex items-center">
-                                <i class="fa-solid fa-table-list text-blue-500 mr-2"></i> 屬性資料
-                            </div>
-                            <table class="popup-table"><tbody>`;
+                        let popupContent = `<div class="font-bold text-[#1f2937] mb-2 border-b pb-2"><i class="fa-solid fa-table-list text-blue-500 mr-2"></i> 屬性資料</div><table class="popup-table"><tbody>`;
                         let hasData = false;
                         for (let key in feature.properties) {
                             let val = feature.properties[key];
                             if(val === null || val === undefined) val = "";
                             popupContent += `<tr><th>${key}</th><td>${val}</td></tr>`;
+                            fieldsSet.add(key); // 將欄位加入集合
                             hasData = true;
                         }
                         popupContent += '</tbody></table>';
-                        
                         if (hasData) {
                             layer.bindPopup(popupContent, { maxWidth: 350, minWidth: 200 });
                             layer.bindTooltip("點擊查看屬性", { sticky: true, className: 'text-sm bg-white px-2 py-1 shadow rounded border border-gray-200' });
@@ -357,48 +335,235 @@
             clusterGroup.addLayer(geoJsonLayer);
             map.addLayer(clusterGroup);
             map.fitBounds(clusterGroup.getBounds());
-            addLayerToSidebar(fileName, clusterGroup);
+
+            let heatLayer = null;
+            if (isPointData && heatData.length > 0) {
+                heatLayer = L.heatLayer(heatData, { radius: 18, blur: 15, maxZoom: 16, minOpacity: 0.1, gradient: { 0.2: '#0000ff', 0.4: '#00ffff', 0.6: '#00ff00', 0.8: '#ffff00', 0.95: '#ff0000', 1.0: '#8b0000' }});
+            }
+
+            const layerId = 'layer-' + layerIdCounter;
+            
+            // 儲存搜尋所需的參考資料
+            searchDataMap[layerId] = {
+                name: fileName,
+                geoJsonLayer: geoJsonLayer,   // 原始資料層，用來迭代比對字串
+                clusterGroup: clusterGroup,   // 群聚層，用來觸發 zoomToShowLayer
+                fields: Array.from(fieldsSet) // 該圖層擁有的欄位陣列
+            };
+
+            addLayerToSidebar(layerId, fileName, clusterGroup, heatLayer, geoJsonLayer, hexColor, initialOpacity);
+            updateSearchLayerDropdown(); // 更新搜尋頁籤的下拉式選單
+            layerIdCounter++;
         }
 
-        function addLayerToSidebar(name, layer) {
-            const id = 'layer-' + (layerIdCounter++);
+        function addLayerToSidebar(id, name, layer, heatLayer, geoJsonLayer, initialColor, initialOpacity) {
             userLayersMap[id] = layer;
-            
+            const emptyMsg = document.getElementById('empty-layers-msg');
             if (emptyMsg) emptyMsg.style.display = 'none';
 
+            let heatToggleHTML = '';
+            if (heatLayer) {
+                const heatId = 'heat-' + id;
+                userLayersMap[heatId] = heatLayer; 
+                heatToggleHTML = `
+                    <div class="mt-2 pl-6 flex items-center">
+                        <input type="checkbox" id="${heatId}" class="w-3.5 h-3.5 text-orange-500 bg-white border-gray-300 rounded focus:ring-orange-500 cursor-pointer">
+                        <label for="${heatId}" class="ml-2 text-xs font-semibold text-orange-600 cursor-pointer hover:text-orange-700 transition"><i class="fa-solid fa-fire text-orange-500 mr-1"></i>切換熱力圖模式</label>
+                    </div>`;
+            }
+
+            const styleControlsHTML = `
+                <div class="mt-2 pl-6 pr-2 py-2 bg-white rounded border border-gray-100 shadow-sm flex flex-col space-y-3">
+                    <div class="flex items-center justify-between text-xs">
+                        <label class="text-gray-600 font-medium"><i class="fa-solid fa-palette mr-1.5 text-blue-400"></i>顏色</label>
+                        <input type="color" id="color-${id}" value="${initialColor}" class="w-6 h-6 p-0 border border-gray-200 rounded cursor-pointer">
+                    </div>
+                    <div class="flex items-center justify-between text-xs">
+                        <label class="text-gray-600 font-medium whitespace-nowrap mr-3"><i class="fa-solid fa-droplet-half-stroke mr-1.5 text-blue-400"></i>透明度</label>
+                        <input type="range" id="opacity-${id}" min="0" max="1" step="0.1" value="${initialOpacity}" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    </div>
+                </div>`;
+
             const div = document.createElement('div');
-            div.className = 'flex items-center justify-between mb-2 bg-gray-50 border border-gray-100 p-2 rounded hover:shadow-sm transition';
+            div.className = 'flex flex-col mb-2 bg-gray-50 border border-gray-200 p-2 rounded hover:shadow-sm transition';
             div.id = `container-${id}`;
             div.innerHTML = `
-                <div class="flex items-center overflow-hidden flex-1 mr-2">
-                    <input type="checkbox" id="${id}" checked class="w-4 h-4 text-green-600 bg-white border-gray-300 rounded focus:ring-green-500 cursor-pointer flex-shrink-0">
-                    <label for="${id}" class="ml-2 text-sm font-semibold text-gray-700 truncate cursor-pointer" style="max-width: 140px;" title="${name}">${name}</label>
+                <div class="flex justify-between items-center w-full">
+                    <div class="flex items-center overflow-hidden flex-1 mr-2">
+                        <input type="checkbox" id="${id}" checked class="w-4 h-4 text-green-600 bg-white border-gray-300 rounded focus:ring-green-500 cursor-pointer flex-shrink-0">
+                        <label for="${id}" class="ml-2 text-sm font-semibold text-gray-700 truncate cursor-pointer" title="${name}">${name}</label>
+                    </div>
+                    <div class="flex items-center flex-shrink-0 space-x-2">
+                        <button onclick="zoomToLayerBounds('${id}')" class="text-blue-400 hover:text-blue-600 transition" title="縮放至圖層範圍"><i class="fa-solid fa-magnifying-glass-location"></i></button>
+                        <button onclick="removeLayer('${id}')" class="text-red-400 hover:text-red-600 transition" title="移除圖層"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
                 </div>
-                <div class="flex items-center flex-shrink-0 space-x-2">
-                    <button onclick="zoomToLayer('${id}')" class="text-blue-400 hover:text-blue-600 transition" title="縮放至圖層範圍">
-                        <i class="fa-solid fa-magnifying-glass-location"></i>
-                    </button>
-                    <button onclick="removeLayer('${id}')" class="text-red-400 hover:text-red-600 transition" title="移除圖層">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </button>
-                </div>
-            `;
-            userLayersControl.appendChild(div);
-            layerCountEl.textContent = Object.keys(userLayersMap).length;
+                ${heatToggleHTML} ${styleControlsHTML}`;
+            
+            document.getElementById('user-layers-list').appendChild(div);
+            updateLayerCount();
+
+            document.getElementById(`color-${id}`).addEventListener('input', (e) => geoJsonLayer.setStyle({ color: e.target.value, fillColor: e.target.value }));
+            document.getElementById(`opacity-${id}`).addEventListener('input', (e) => {
+                const op = parseFloat(e.target.value);
+                geoJsonLayer.setStyle({ fillOpacity: op, opacity: op });
+            });
 
             document.getElementById(id).addEventListener('change', function(e) {
-                if (e.target.checked) map.addLayer(userLayersMap[id]);
-                else map.removeLayer(userLayersMap[id]);
+                const heatCheck = document.getElementById('heat-' + id);
+                if (e.target.checked) {
+                    if (heatCheck && heatCheck.checked) map.addLayer(userLayersMap['heat-' + id]); 
+                    else map.addLayer(userLayersMap[id]);                      
+                } else {
+                    map.removeLayer(userLayersMap[id]);                        
+                    if (heatCheck) map.removeLayer(userLayersMap['heat-' + id]);
+                }
             });
+
+            if (heatLayer) {
+                document.getElementById('heat-' + id).addEventListener('change', function(e) {
+                    if (document.getElementById(id).checked) {
+                        if (e.target.checked) { map.removeLayer(userLayersMap[id]); map.addLayer(userLayersMap['heat-' + id]); } 
+                        else { map.removeLayer(userLayersMap['heat-' + id]); map.addLayer(userLayersMap[id]); }
+                    }
+                });
+            }
         }
 
-        window.zoomToLayer = function(id) {
-            if(userLayersMap[id]) {
-                const checkbox = document.getElementById(id);
-                if(!checkbox.checked) {
-                    checkbox.checked = true;
-                    map.addLayer(userLayersMap[id]);
+        /* ==========================================
+         * 🌟 資料屬性搜尋核心邏輯 (Custom Search)
+         * ========================================== */
+        const searchLayerSelect = document.getElementById('search-layer-select');
+        const searchFieldSelect = document.getElementById('search-field-select');
+        const searchInput = document.getElementById('search-input');
+        const searchResultsList = document.getElementById('search-results-list');
+        const searchResultCount = document.getElementById('search-result-count');
+
+        // 更新圖層下拉選單
+        function updateSearchLayerDropdown() {
+            searchLayerSelect.innerHTML = '<option value="">請選擇要搜尋的圖層</option>';
+            for (let id in searchDataMap) {
+                searchLayerSelect.innerHTML += `<option value="${id}">${searchDataMap[id].name}</option>`;
+            }
+            if(Object.keys(searchDataMap).length > 0) {
+                searchLayerSelect.value = Object.keys(searchDataMap)[0];
+                updateSearchFields();
+            }
+        }
+
+        // 當圖層改變時，更新欄位下拉選單
+        searchLayerSelect.addEventListener('change', updateSearchFields);
+        function updateSearchFields() {
+            const layerId = searchLayerSelect.value;
+            searchFieldSelect.innerHTML = '';
+            if (!layerId || !searchDataMap[layerId]) {
+                searchFieldSelect.innerHTML = '<option value="">(無欄位)</option>';
+                return;
+            }
+            const fields = searchDataMap[layerId].fields;
+            fields.forEach(f => {
+                searchFieldSelect.innerHTML += `<option value="${f}">${f}</option>`;
+            });
+            executeSearch(); // 切換圖層或欄位時，重新以現有字串搜尋
+        }
+
+        // 監聽字串輸入與欄位改變
+        searchInput.addEventListener('input', executeSearch);
+        searchFieldSelect.addEventListener('change', executeSearch);
+
+        // 執行搜尋與建立清單
+        function executeSearch() {
+            const layerId = searchLayerSelect.value;
+            const field = searchFieldSelect.value;
+            const keyword = searchInput.value.toLowerCase().trim();
+
+            searchResultsList.innerHTML = '';
+            searchResultCount.textContent = '0';
+
+            if (!layerId || !field) {
+                searchResultsList.innerHTML = '<p class="text-xs text-gray-400 italic text-center py-4">請先選擇圖層與欄位</p>';
+                return;
+            }
+            if (keyword === '') {
+                searchResultsList.innerHTML = '<p class="text-xs text-gray-400 italic text-center py-4">請輸入關鍵字開始搜尋</p>';
+                return;
+            }
+
+            const targetData = searchDataMap[layerId];
+            let count = 0;
+            let resultsHTML = '';
+
+            // 遍歷所有特徵 (Features) 進行字串比對
+            targetData.geoJsonLayer.eachLayer(function(layer) {
+                const props = layer.feature.properties;
+                if (props && props[field]) {
+                    const cellValue = String(props[field]);
+                    if (cellValue.toLowerCase().includes(keyword)) {
+                        count++;
+                        // 取得 Leaflet 內部 ID，用於點擊定位
+                        const leafletId = targetData.geoJsonLayer.getLayerId(layer);
+                        
+                        // 嘗試抓取名稱當作標題，若無則顯示搜尋到的字串
+                        const titleField = props['name'] || props['名稱'] || props['Name'] || cellValue;
+
+                        resultsHTML += `
+                            <div onclick="locateSearchResult('${layerId}', ${leafletId})" class="p-2 bg-white border border-gray-200 rounded cursor-pointer hover:border-blue-400 hover:shadow-sm transition group">
+                                <div class="font-bold text-sm text-gray-800 group-hover:text-blue-600">${titleField}</div>
+                                <div class="text-xs text-gray-500 mt-1 flex">
+                                    <span class="bg-gray-100 px-1 rounded mr-1 text-gray-400 border">${field}</span>
+                                    <span class="truncate">${cellValue}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
                 }
+            });
+
+            searchResultCount.textContent = count;
+            if (count > 0) {
+                searchResultsList.innerHTML = resultsHTML;
+            } else {
+                searchResultsList.innerHTML = '<p class="text-xs text-red-400 italic text-center py-4">找不到符合的資料，請嘗試其他關鍵字</p>';
+            }
+        }
+
+        // 點擊搜尋結果 ➔ 飛過去並彈出 Popup
+        window.locateSearchResult = function(layerId, leafletInternalId) {
+            const dataInfo = searchDataMap[layerId];
+            if (!dataInfo) return;
+
+            // 確保主圖層勾選框有打開，否則加回地圖
+            const mainCheckbox = document.getElementById(layerId);
+            if (!mainCheckbox.checked) {
+                mainCheckbox.checked = true;
+                map.addLayer(dataInfo.clusterGroup);
+            }
+
+            // 取得目標的獨立圖層元件 (Maker/Polygon)
+            const targetFeatureLayer = dataInfo.geoJsonLayer.getLayer(leafletInternalId);
+
+            // 【神級處理】如果是點位，且被包在 Cluster 群聚裡面，使用 zoomToShowLayer 將群聚解開
+            if (targetFeatureLayer instanceof L.Marker || targetFeatureLayer instanceof L.CircleMarker) {
+                dataInfo.clusterGroup.zoomToShowLayer(targetFeatureLayer, function () {
+                    targetFeatureLayer.openPopup();
+                });
+            } else {
+                // 如果是多邊形/線條，直接縮放到範圍
+                map.fitBounds(targetFeatureLayer.getBounds(), { padding: [50, 50], maxZoom: 17 });
+                targetFeatureLayer.openPopup();
+            }
+
+            // 在手機版上點擊後自動收起側邊欄以便看地圖
+            if(window.innerWidth < 768) sidebar.classList.add('-translate-x-full');
+        }
+
+        /* ==========================================
+         * 雜項與輔助函數
+         * ========================================== */
+        window.zoomToLayerBounds = function(id) {
+            if(userLayersMap[id]) {
+                const cb = document.getElementById(id);
+                if(!cb.checked) { cb.checked = true; map.addLayer(userLayersMap[id]); }
                 const bounds = userLayersMap[id].getBounds ? userLayersMap[id].getBounds() : userLayersMap[id].getLayers()[0].getBounds();
                 map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
                 if(window.innerWidth < 768) sidebar.classList.add('-translate-x-full');
@@ -406,58 +571,29 @@
         }
 
         window.removeLayer = function(id) {
-            if (userLayersMap[id]) {
-                map.removeLayer(userLayersMap[id]);
-                delete userLayersMap[id];
-            }
+            if (userLayersMap[id]) { map.removeLayer(userLayersMap[id]); delete userLayersMap[id]; }
+            if (userLayersMap['heat-' + id]) { map.removeLayer(userLayersMap['heat-' + id]); delete userLayersMap['heat-' + id]; }
+            delete searchDataMap[id]; // 移除搜尋註冊資料
+            
             const container = document.getElementById(`container-${id}`);
             if (container) container.remove();
             
-            const count = Object.keys(userLayersMap).length;
-            layerCountEl.textContent = count;
-            if (count === 0 && emptyMsg) emptyMsg.style.display = 'block';
+            updateLayerCount();
+            updateSearchLayerDropdown(); // 圖層被刪除，同步更新搜尋選單
+        }
+
+        function updateLayerCount() {
+            const count = Object.keys(userLayersMap).filter(k => !k.startsWith('heat-')).length;
+            document.getElementById('layer-count').textContent = count;
+            const emptyMsg = document.getElementById('empty-layers-msg');
+            if (emptyMsg) emptyMsg.style.display = count === 0 ? 'block' : 'none';
         }
 
         function showUploadStatus(html, type) {
             const el = document.getElementById('uploadStatus');
             el.innerHTML = html;
-            el.classList.remove('hidden', 'bg-blue-100', 'text-blue-700', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
-            
-            if (type === 'loading') el.classList.add('bg-blue-100', 'text-blue-700');
-            else if (type === 'error') el.classList.add('bg-red-100', 'text-red-700');
-            else if (type === 'success') el.classList.add('bg-green-100', 'text-green-700');
+            el.className = `text-sm p-3 rounded-lg font-medium text-center shadow-sm ${type === 'loading' ? 'bg-blue-100 text-blue-700' : type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
         }
-
-        /* ==========================================
-         * 4. 【新增】從 URL 直接載入伺服器上的 Shapefile 範例
-         * ========================================== */
-        function loadShapefileFromURL(url, fileName) {
-            // 切換到載入圖資頁籤顯示讀取動畫
-            switchTab('upload');
-            showUploadStatus(`<i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在下載並解析內建圖資 (${fileName})...`, 'loading');
-            
-            fetch(url)
-                .then(response => {
-                    if (!response.ok) throw new Error("無法讀取檔案，請確認路徑是否正確");
-                    return response.arrayBuffer(); // 將檔案轉為二進制 Buffer
-                })
-                .then(buffer => {
-                    return shp(buffer); // 交給 shpjs 解析
-                })
-                .then(geojson => {
-                    addGeoJsonLayer(fileName, geojson);
-                    showUploadStatus('<i class="fa-solid fa-circle-check mr-2"></i> 內建圖資載入成功！', 'success');
-                    setTimeout(() => document.getElementById('uploadStatus').classList.add('hidden'), 3000);
-                })
-                .catch(err => {
-                    console.error(err);
-                    showUploadStatus('<i class="fa-solid fa-triangle-exclamation mr-2"></i> 載入失敗：' + err.message, 'error');
-                });
-        }
-
-        // 👉 若要測試直接載入，請將你的 zip 檔放在與 HTML 同一個資料夾，然後取消下方註解：
-        // loadShapefileFromURL('./taichung_buildings.zip', '台中建築物');
-
     </script>
 </body>
 </html>
